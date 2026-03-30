@@ -1,0 +1,15 @@
+node_modules
+.pnpm-store
+.DS_Store
+dist
+.env
+.env.*
+coverage
+.turbo
+
+apps/api/node_modules
+apps/web/node_modules
+packages/shared/node_modules
+
+apps/api/.env
+apps/api/.env.*

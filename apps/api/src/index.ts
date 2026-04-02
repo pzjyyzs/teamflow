@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { loadEnv } from "./env.js";
 import { connectMongo } from "./db.js";
 import { cors } from "hono/cors";
+import { authRoutes } from "./auth/routes.js";
 
 const env = loadEnv();
 await connectMongo(env.MONGODB_URI);
@@ -19,6 +20,7 @@ app.use(
   })
 )
 
+app.route('/auth', authRoutes)
 app.get("/health", (c) => c.json({ ok: true }));
 
 serve(

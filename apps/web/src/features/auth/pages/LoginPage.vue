@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useAuthStore } from '../store/auth.store';
 import { ref } from 'vue';
 import { to } from '../../../shared/utils/to';
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 
-const username = ref('demo@example.com')
+const email = ref('demo@example.com')
 const password = ref('password')
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -16,7 +18,7 @@ const error = ref<string | null>(null)
 async function onLogin() {
   loading.value = true
   error.value = null
-  const [err] = await to(auth.login(username.value, password.value))
+  const [err] = await to(auth.login(email.value, password.value))
 
   loading.value = false
 
@@ -25,7 +27,8 @@ async function onLogin() {
     return
   }
 
-  router.push('/app')
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/app'
+  router.push(redirect)
 }
 </script>
 
@@ -34,7 +37,7 @@ async function onLogin() {
     <h1 class="text-2xl font-bold">Login</h1>
 
     <div class="space-y-2">
-      <input class="border rounded px-3 py-2 w-full" v-model="username" placeholder="username" />
+      <input class="border rounded px-3 py-2 w-full" v-model="email" placeholder="email" />
       <input class="border rounded px-3 py-2 w-full" type="password" v-model="password" placeholder="password" />
     </div>
 

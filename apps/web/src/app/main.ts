@@ -3,5 +3,14 @@ import { createPinia } from 'pinia'
 import '../style.css'
 import App from '../App.vue'
 import router from '../app/router'
+import { useAuthStore } from '../features/auth/store/auth.store'
 
-createApp(App).use(createPinia()).use(router).mount('#app')
+const app = createApp(App)
+const pinia = createPinia()
+
+app.use(pinia)
+
+const auth = useAuthStore(pinia)
+void auth.restoreSession().finally(() => {
+  app.use(router).mount('#app')
+})

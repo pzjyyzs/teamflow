@@ -13,8 +13,12 @@ const router = createRouter({
 
 router.beforeEach((to) => {
     const auth = useAuthStore()
+    if (to.path === '/login' && auth.isAuthed) {
+        return typeof to.query.redirect === 'string' ? to.query.redirect : '/app'
+    }
+
     if (to.path === '/login') return true
-    if (!auth.isAuthed) return '/login'
+    if (!auth.isAuthed) return { path: '/login', query: { redirect: to.fullPath } }
     return true
 })
 

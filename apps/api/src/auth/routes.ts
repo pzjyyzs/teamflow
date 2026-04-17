@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { UserModel } from './user.model'
 import bcrypt from 'bcrypt'
 import { HTTPException } from 'hono/http-exception'
+import { ROLES, getPermissionsForRoles } from '../../../../packages/shared/src/rbac'
 
 export const authRoutes = new Hono()
 
@@ -31,7 +32,9 @@ authRoutes.post('/login', async (c) => {
     const id = user._id.toString()
     const email = user.email
     const roles = [...user.roles]
-    return c.json({ accessToken: `demo-token:${id}`, email, roles, id }, 200)
+    const permissions = getPermissionsForRoles(roles)
+
+    return c.json({ accessToken: `demo-token:${id}`, email, roles, permissions, id }, 200)
 })
 
 authRoutes.post('/register', async (c) => {
@@ -44,7 +47,8 @@ authRoutes.post('/register', async (c) => {
     const passwordHash = await bcrypt.hash(body.password, 10)
     const newUser = new UserModel({
         email: body.email,
-        passwordHash
+        passwordHash,
+        roles: [ROLES.Member],
     })
 
     await newUser.save().catch((error) => {
@@ -60,8 +64,9 @@ authRoutes.post('/register', async (c) => {
     const id = newUser._id.toString()
     const email = newUser.email
     const roles = [...newUser.roles]
+    const permissions = getPermissionsForRoles(roles)
 
-    return c.json({ message: 'User registered successfully', email, id, roles }, 201)
+    return c.json({ message: 'User registered successfully', email, id, roles, permissions }, 201)
 })
 
 authRoutes.get('/me', async (c) => {
@@ -88,10 +93,12 @@ authRoutes.get('/me', async (c) => {
     const id = user._id.toString()
     const email = user.email
     const roles = [...user.roles]
+    const permissions = getPermissionsForRoles(roles)
 
     return c.json({
         id,
         email,
         roles,
+        permissions,
     }, 200)
 })

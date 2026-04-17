@@ -4,8 +4,15 @@
   "packageManager": "pnpm@9.0.1",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
+    "dev:full": "pnpm db:up && pnpm dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "format": "pnpm -r format",
+    "format:check": "pnpm -r format:check",
+    "typecheck": "pnpm -r typecheck",
+    "db:up": "docker compose --env-file infra/.env -f infra/docker-compose.yml up -d",
+    "db:down": "docker compose --env-file infra/.env -f infra/docker-compose.yml down",
+    "db:status": "docker compose --env-file infra/.env -f infra/docker-compose.yml ps",
+    "db:logs": "docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f"
   }
 }

@@ -49,11 +49,15 @@ export const useAuthStore = defineStore('auth', () => {
         restoring.value = false
     }
 
+    async function register(email: string, password: string) {
+        await authApi.register({ email, password })
+    }
+
     function logout() {
         token.value = null
         user.value = null
         localStorage.removeItem(TOKEN_STORAGE_KEY)
     }
 
-    return { token, user, isAuthed, restoring, login, restoreSession, logout }
+    return { token, user, isAuthed, restoring, login, restoreSession, logout, register }
 })

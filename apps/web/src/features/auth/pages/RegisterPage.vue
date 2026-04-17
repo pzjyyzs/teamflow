@@ -1,22 +1,37 @@
 <script setup lang="ts">
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth.store'
-import { ref } from 'vue'
 import { to } from '../../../shared/utils/to'
 
 const auth = useAuthStore()
 const router = useRouter()
-const route = useRoute()
-
-const email = ref()
-const password = ref()
+const email = ref('')
+const password = ref('')
+const confirmPassword = ref('')
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-async function onLogin() {
-  loading.value = true
+async function onRegister() {
   error.value = null
-  const [err] = await to(auth.login(email.value, password.value))
+  
+  if (!email.value.trim() || !password.value.trim() || !confirmPassword.value.trim()) {
+    error.value = 'Please fill in all fields'
+    return
+  }
+  
+  if (password.value.length < 6) {
+    error.value = 'Password must be at least 6 characters'
+    return
+  }
+
+  if (password.value !== confirmPassword.value) {
+    error.value = 'Passwords do not match'
+    return
+  }
+
+  loading.value = true
+
+  const [err] = await to(auth.register(email.value, password.value))
 
   loading.value = false
 
@@ -25,8 +40,8 @@ async function onLogin() {
     return
   }
 
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/app'
-  router.push(redirect)
+  router.push('/login')
+  
 }
 </script>
 
@@ -35,11 +50,11 @@ async function onLogin() {
     <div class="mx-auto max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
       <div class="space-y-2">
         <p class="text-sm font-medium uppercase tracking-[0.18em] text-zinc-500">TeamFlow</p>
-        <h1 class="text-3xl font-bold text-zinc-900">Welcome back</h1>
-        <p class="text-sm text-zinc-600">Sign in to continue to your authenticated workspace.</p>
+        <h1 class="text-3xl font-bold text-zinc-900">Create your account</h1>
+        <p class="text-sm text-zinc-600">Set up a workspace login to continue building your admin flow.</p>
       </div>
 
-      <form class="mt-8 space-y-4" @submit.prevent="onLogin">
+      <form class="mt-8 space-y-4" @submit.prevent="onRegister">
         <label class="block space-y-2">
           <span class="text-sm font-medium text-zinc-700">Email</span>
           <input
@@ -56,8 +71,19 @@ async function onLogin() {
           <input
             v-model="password"
             type="password"
-            autocomplete="current-password"
-            placeholder="Enter your password"
+            autocomplete="new-password"
+            placeholder="At least 6 characters"
+            class="w-full rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none transition focus:border-zinc-900"
+          />
+        </label>
+
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-zinc-700">Confirm password</span>
+          <input
+            v-model="confirmPassword"
+            type="password"
+            autocomplete="new-password"
+            placeholder="Repeat your password"
             class="w-full rounded-xl border border-zinc-300 px-4 py-3 text-zinc-900 outline-none transition focus:border-zinc-900"
           />
         </label>
@@ -69,14 +95,14 @@ async function onLogin() {
           class="w-full rounded-xl bg-black px-4 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="loading"
         >
-          {{ loading ? 'Logging in...' : 'Login' }}
+          {{ loading ? 'Creating account...' : 'Create account' }}
         </button>
       </form>
 
       <p class="mt-6 text-sm text-zinc-600">
-        Need an account?
-        <RouterLink to="/register" class="font-medium text-zinc-900 underline underline-offset-4">
-          Create one
+        Already have an account?
+        <RouterLink to="/login" class="font-medium text-zinc-900 underline underline-offset-4">
+          Sign in
         </RouterLink>
       </p>
     </div>

@@ -1,9 +1,11 @@
-import { Hono } from 'hono'
-import { z } from 'zod'
+import { Context, Hono } from 'hono'
+import { email, z } from 'zod'
 import { UserModel } from './user.model'
 import bcrypt from 'bcrypt'
 import { HTTPException } from 'hono/http-exception'
 import { ROLES, getPermissionsForRoles } from '../../../../packages/shared/src/rbac'
+import { use } from 'hono/jsx'
+import { generateAccessToken, generateRefreshToken, verifyToken } from './jwt'
 
 export const authRoutes = new Hono()
 
@@ -17,7 +19,11 @@ const RegisterSchema = z.object({
     password: z.string().min(6),
 })
 
-authRoutes.post('/login', async (c) => {
+const RefreshSchema = z.object({
+    refreshToken: z.string()
+})
+
+authRoutes.post('/login', async (c: Context) => {
     const body = LoginSchema.parse(await c.req.json())
     const user = await UserModel.findOne({ email: body.email })
     if (!user) {
@@ -29,15 +35,32 @@ authRoutes.post('/login', async (c) => {
         return c.json({ message: 'Invalid email or password' }, 401)
     }
 
-    const id = user._id.toString()
-    const email = user.email
-    const roles = [...user.roles]
-    const permissions = getPermissionsForRoles(roles)
+    const payload = {
+        userId: user._id.toString(),
+        email: user.email,
+        roles: [...user.roles]
+    }
 
-    return c.json({ accessToken: `demo-token:${id}`, email, roles, permissions, id }, 200)
+    const accessToken = await generateAccessToken(payload, c.env.JWT_SECRET)
+    const refreshToken = await generateRefreshToken(user._id.toString(), c.env.JWT_SECRET)
+
+    user.refreshToken = refreshToken
+
+    await user.save()
+
+    const permissions = getPermissionsForRoles(user.roles)
+
+    return c.json({
+        accessToken,
+        refreshToken,
+        email: user.email,
+        roles: [...user.roles],
+        permissions,
+        id: user._id.toString()
+    }, 200)
 })
 
-authRoutes.post('/register', async (c) => {
+authRoutes.post('/register', async (c: Context) => {
     const body = RegisterSchema.parse(await c.req.json())
     const existingUser = await UserModel.findOne({ email: body.email })
     if (existingUser) {
@@ -69,36 +92,67 @@ authRoutes.post('/register', async (c) => {
     return c.json({ message: 'User registered successfully', email, id, roles, permissions }, 201)
 })
 
-authRoutes.get('/me', async (c) => {
+authRoutes.get('/me', async (c: Context) => {
     const auth = c.req.header('authorization') ?? ''
     if (!auth.startsWith('Bearer ')) {
         return c.json({ message: 'Unauthorized' }, 401)
     }
 
     const accessToken = auth.slice('Bearer '.length)
-    if (!accessToken.startsWith('demo-token:')) {
+    const payload = await verifyToken(accessToken, c.env.JWT_SECRET)
+    if (!payload) {
         return c.json({ message: 'Unauthorized' }, 401)
     }
 
-    const userId = accessToken.slice('demo-token:'.length)
-    if (!userId) {
-        return c.json({ message: 'Unauthorized' }, 401)
-    }
-
-    const user = await UserModel.findById(userId)
+    const user = await UserModel.findById(payload.userId)
     if (!user) {
         return c.json({ message: 'Unauthorized' }, 401)
     }
 
-    const id = user._id.toString()
-    const email = user.email
-    const roles = [...user.roles]
-    const permissions = getPermissionsForRoles(roles)
+    const permissions = getPermissionsForRoles(user.roles)
 
     return c.json({
-        id,
-        email,
-        roles,
+        id: user._id.toString(),
+        email: user.email,
+        roles: [...user.roles],
         permissions,
+    }, 200)
+})
+
+authRoutes.post('/refresh', async (c: Context) => {
+    const body = RefreshSchema.parse(await c.req.json())
+
+    const payload = await verifyToken(body.refreshToken, c.env.JWT_SECRET)
+    if (!payload || !payload.userId) {
+        return c.json({ message: 'Invalid refresh token' }, 401)
+    }
+
+    const user = await UserModel.findById(payload.userId)
+    if (!user || user.refreshToken !== body.refreshToken) {
+        return c.json({ message: 'Invalid refresh token' }, 401)
+    }
+
+    const newPayload = {
+        userId: user._id.toString(),
+        email: user.email,
+        roles: [...user.roles]
+    }
+
+    const accessToken = await generateAccessToken(newPayload, c.env.JWT_SECRET)
+    const newRefreshToken = await generateRefreshToken(user._id.toString(), c.env.JWT_SECRET)
+
+    user.refreshToken = newRefreshToken
+
+    await user.save()
+
+    const permissions = getPermissionsForRoles(user.roles)
+
+    return c.json({
+        accessToken,
+        refreshToken: newRefreshToken,
+        email: user.email,
+        roles: [...user.roles],
+        permissions,
+        id: user._id.toString()
     }, 200)
 })

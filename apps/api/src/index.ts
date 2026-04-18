@@ -9,7 +9,11 @@ import { authRoutes } from "./auth/routes.js";
 const env = loadEnv();
 await connectMongo(env.MONGODB_URI);
 
-const app = new Hono();
+const app = new Hono<{
+  Bindings: {
+    JWT_SECRET: string
+  }
+}>()
 
 app.use(
   '*',
@@ -20,8 +24,13 @@ app.use(
   })
 )
 
+app.use('*', async (c, next) => {
+  c.env.JWT_SECRET = env.JWT_SECRET
+  await next()
+})
+
 app.route('/auth', authRoutes)
-app.get("/health", (c) => c.json({ ok: true }));
+app.get("/health", (c) => c.json({ ok: true }))
 
 serve(
   {

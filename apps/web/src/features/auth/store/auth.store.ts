@@ -2,26 +2,38 @@ import { defineStore } from "pinia"
 import { computed, ref } from "vue"
 import * as authApi from '../api/auth.api'
 import { to } from "../../../shared/utils/to"
+import {
+    getAccessToken,
+    getRefreshToken,
+    setTokens,
+    clearTokens
+} from "../../../shared/auth/token"
 
 type User = authApi.MeRes
-const TOKEN_STORAGE_KEY = 'teamflow.accessToken'
 
 export const useAuthStore = defineStore('auth', () => {
     const token = ref<string | null>(null)
     const user = ref<User | null>(null)
     const restoring = ref(false)
+    const refreshToken = ref<string | null>(null)
 
     const isAuthed = computed(() => Boolean(token.value && user.value))
 
     async function login(email: string, password: string) {
-        const { accessToken } = await authApi.login({ email, password })
+        const { accessToken, refreshToken: newRefreshToken } = await authApi.login({ email, password })
+
+        // 使用 token.ts 的函数管理 token
+        setTokens(accessToken, newRefreshToken)
+
         token.value = accessToken
-        localStorage.setItem(TOKEN_STORAGE_KEY, accessToken)
-        const [err, userData] = await to(authApi.me(accessToken))
+        refreshToken.value = newRefreshToken
+
+        const [err, userData] = await to(authApi.me())
 
         if (err) {
             token.value = null
-            localStorage.removeItem(TOKEN_STORAGE_KEY)
+            refreshToken.value = null
+            clearTokens()
             throw err
         }
 
@@ -29,18 +41,21 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     async function restoreSession() {
-        const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY)
-        if (!savedToken || restoring.value) return
+        const savedToken = getAccessToken()
+        const savedRefreshToken = getRefreshToken()
+        if (!savedToken || !savedRefreshToken || restoring.value) return
 
         restoring.value = true
         token.value = savedToken
+        refreshToken.value = savedRefreshToken
 
-        const [err, userData] = await to(authApi.me(savedToken))
+        const [err, userData] = await to(authApi.me())
 
         if (err) {
             token.value = null
             user.value = null
-            localStorage.removeItem(TOKEN_STORAGE_KEY)
+            refreshToken.value = null
+            clearTokens()
             restoring.value = false
             return
         }
@@ -55,9 +70,16 @@ export const useAuthStore = defineStore('auth', () => {
 
     function logout() {
         token.value = null
+        refreshToken.value = null
         user.value = null
-        localStorage.removeItem(TOKEN_STORAGE_KEY)
+        clearTokens()
     }
 
-    return { token, user, isAuthed, restoring, login, restoreSession, logout, register }
+    function updateTokens(newAccessToken: string, newRefreshToken: string) {
+        token.value = newAccessToken
+        refreshToken.value = newRefreshToken
+        setTokens(newAccessToken, newRefreshToken)
+    }
+
+    return { token, refreshToken, user, isAuthed, restoring, login, restoreSession, logout, register, updateTokens }
 })

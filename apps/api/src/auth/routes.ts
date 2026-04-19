@@ -1,11 +1,12 @@
 import { Context, Hono } from 'hono'
-import { email, z } from 'zod'
+import { z } from 'zod'
 import { UserModel } from './user.model'
 import bcrypt from 'bcrypt'
 import { HTTPException } from 'hono/http-exception'
 import { ROLES, getPermissionsForRoles } from '../../../../packages/shared/src/rbac'
-import { use } from 'hono/jsx'
 import { generateAccessToken, generateRefreshToken, verifyToken } from './jwt'
+import { permit } from './permit'
+import { authMiddleware } from './auth.middleware'
 
 export const authRoutes = new Hono()
 
@@ -92,31 +93,9 @@ authRoutes.post('/register', async (c: Context) => {
     return c.json({ message: 'User registered successfully', email, id, roles, permissions }, 201)
 })
 
-authRoutes.get('/me', async (c: Context) => {
-    const auth = c.req.header('authorization') ?? ''
-    if (!auth.startsWith('Bearer ')) {
-        return c.json({ message: 'Unauthorized' }, 401)
-    }
-
-    const accessToken = auth.slice('Bearer '.length)
-    const payload = await verifyToken(accessToken, c.env.JWT_SECRET)
-    if (!payload) {
-        return c.json({ message: 'Unauthorized' }, 401)
-    }
-
-    const user = await UserModel.findById(payload.userId)
-    if (!user) {
-        return c.json({ message: 'Unauthorized' }, 401)
-    }
-
-    const permissions = getPermissionsForRoles(user.roles)
-
-    return c.json({
-        id: user._id.toString(),
-        email: user.email,
-        roles: [...user.roles],
-        permissions,
-    }, 200)
+authRoutes.get('/me', authMiddleware, async (c: Context) => {
+    const user = c.get('user')
+    return c.json(user, 200)
 })
 
 authRoutes.post('/refresh', async (c: Context) => {
